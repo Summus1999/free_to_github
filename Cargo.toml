@@ -1,0 +1,26 @@
+[package]
+name = "free_to_github"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.24"
+egui = "0.24"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "windef", "wingdi"] }
+
+# Windows 下隐藏控制台窗口
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+[[bin]]
+name = "free_to_github_gui"
+path = "src/main_gui.rs"
+
+[[bin]]
+name = "free_to_github_cli"
+path = "src/main.rs"
