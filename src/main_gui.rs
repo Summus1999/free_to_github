@@ -32,96 +32,166 @@ impl Default for GitHubAcceleratorApp {
 
 impl eframe::App for GitHubAcceleratorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Set dark theme
+        ctx.set_visuals(egui::Visuals::dark());
+        
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                ui.add_space(20.0);
+                ui.add_space(30.0);
                 
-                // 标题
-                ui.heading("🚀 GitHub 访问加速工具");
-                ui.add_space(10.0);
+                // Title area with gradient effect
+                ui.group(|ui| {
+                    ui.set_min_width(450.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(15.0);
+                        ui.heading(egui::RichText::new("🚀 GitHub 访问加速工具")
+                            .size(28.0)
+                            .color(egui::Color32::from_rgb(100, 200, 255)));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("无需第三方服务器")
+                            .size(13.0)
+                            .color(egui::Color32::LIGHT_GRAY));
+                        ui.add_space(15.0);
+                    });
+                });
                 
-                ui.label("基于本地 hosts 文件,无需第三方服务器");
-                ui.add_space(20.0);
+                ui.add_space(25.0);
                 
-                ui.separator();
-                ui.add_space(20.0);
-                
-                // 权限检查
+                // Permission check - warning box
                 let has_permission = *self.has_permission.lock().unwrap();
                 if !has_permission {
-                    ui.colored_label(
-                        egui::Color32::RED,
-                        "⚠️ 没有管理员权限!"
-                    );
-                    ui.label("请以管理员身份运行此程序");
-                    ui.add_space(10.0);
+                    ui.group(|ui| {
+                        ui.set_min_width(450.0);
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("⚠️")
+                                .size(24.0)
+                                .color(egui::Color32::from_rgb(255, 180, 0)));
+                            ui.vertical(|ui| {
+                                ui.label(egui::RichText::new("没有管理员权限")
+                                    .size(16.0)
+                                    .color(egui::Color32::from_rgb(255, 180, 0)));
+                                ui.label(egui::RichText::new("请以管理员身份运行此程序")
+                                    .size(12.0)
+                                    .color(egui::Color32::LIGHT_GRAY));
+                            });
+                        });
+                    });
+                    ui.add_space(20.0);
                 }
                 
-                // 当前状态
+                // Status display area - card style
                 let is_enabled = *self.is_enabled.lock().unwrap();
-                let status_text = if is_enabled { "✅ 已启用" } else { "⭕ 未启用" };
-                let status_color = if is_enabled { 
-                    egui::Color32::from_rgb(0, 200, 0) 
-                } else { 
-                    egui::Color32::GRAY 
+                let (status_text, status_icon, status_color, _bg_color) = if is_enabled {
+                    ("加速已启用", "✅", egui::Color32::from_rgb(0, 220, 120), egui::Color32::from_rgb(20, 60, 40))
+                } else {
+                    ("加速未启用", "⭕", egui::Color32::from_rgb(150, 150, 150), egui::Color32::from_rgb(40, 40, 45))
                 };
                 
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new("当前状态:").size(18.0));
-                ui.label(egui::RichText::new(status_text).size(24.0).color(status_color));
-                ui.add_space(20.0);
+                ui.group(|ui| {
+                    ui.set_min_width(450.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label(egui::RichText::new(status_icon)
+                            .size(48.0));
+                        ui.add_space(10.0);
+                        ui.label(egui::RichText::new(status_text)
+                            .size(22.0)
+                            .color(status_color)
+                            .strong());
+                        ui.add_space(20.0);
+                    });
+                });
                 
-                // 控制按钮
+                ui.add_space(30.0);
+                
+                // Control button area - modern buttons
                 ui.horizontal(|ui| {
-                    ui.add_space(50.0);
+                    ui.add_space(80.0);
                     
-                    if ui.add_sized([120.0, 50.0], 
-                        egui::Button::new(egui::RichText::new("启用加速").size(16.0))
-                    ).clicked() && has_permission {
+                    // Enable button
+                    let enable_btn = egui::Button::new(
+                        egui::RichText::new("🟢 启用加速")
+                            .size(16.0)
+                            .color(if has_permission { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                    )
+                    .fill(egui::Color32::from_rgb(40, 180, 100))
+                    .min_size(egui::vec2(150.0, 50.0));
+                    
+                    if ui.add_enabled(has_permission, enable_btn).clicked() {
                         self.enable_acceleration();
                     }
                     
                     ui.add_space(20.0);
                     
-                    if ui.add_sized([120.0, 50.0], 
-                        egui::Button::new(egui::RichText::new("禁用加速").size(16.0))
-                    ).clicked() && has_permission {
+                    // Disable button
+                    let disable_btn = egui::Button::new(
+                        egui::RichText::new("🔴 禁用加速")
+                            .size(16.0)
+                            .color(if has_permission { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                    )
+                    .fill(egui::Color32::from_rgb(220, 80, 80))
+                    .min_size(egui::vec2(150.0, 50.0));
+                    
+                    if ui.add_enabled(has_permission, disable_btn).clicked() {
                         self.disable_acceleration();
+                    }
+                });
+                
+                ui.add_space(25.0);
+                
+                // Error message
+                if let Some(error) = self.error_message.lock().unwrap().as_ref() {
+                    ui.vertical_centered(|ui| {
+                        ui.label(egui::RichText::new(error)
+                            .size(13.0)
+                            .color(egui::Color32::from_rgb(255, 100, 100)));
+                    });
+                    ui.add_space(15.0);
+                }
+                
+                ui.add_space(20.0);
+                ui.separator();
+                ui.add_space(15.0);
+                
+                // Function button area
+                ui.horizontal(|ui| {
+                    ui.add_space(100.0);
+                    
+                    let dns_btn = egui::Button::new(
+                        egui::RichText::new("🔄 刷新 DNS")
+                            .size(14.0)
+                    )
+                    .fill(egui::Color32::from_rgb(60, 120, 180))
+                    .min_size(egui::vec2(120.0, 35.0));
+                    
+                    if ui.add(dns_btn).clicked() && cfg!(target_os = "windows") {
+                        self.flush_dns();
+                    }
+                    
+                    ui.add_space(15.0);
+                    
+                    let hosts_btn = egui::Button::new(
+                        egui::RichText::new("📂 打开 Hosts")
+                            .size(14.0)
+                    )
+                    .fill(egui::Color32::from_rgb(100, 100, 120))
+                    .min_size(egui::vec2(120.0, 35.0));
+                    
+                    if ui.add(hosts_btn).clicked() && cfg!(target_os = "windows") {
+                        self.open_hosts_folder();
                     }
                 });
                 
                 ui.add_space(20.0);
                 
-                // 状态消息
-                let status_msg = self.status_message.lock().unwrap().clone();
-                ui.label(egui::RichText::new(&status_msg).size(14.0).color(egui::Color32::GRAY));
+                // Bottom info
+                ui.vertical_centered(|ui| {
+                    ui.label(egui::RichText::new("💡 提示: 启用后建议刷新 DNS 缓存")
+                        .size(11.0)
+                        .color(egui::Color32::DARK_GRAY));
+                });
                 
-                // 错误消息
-                if let Some(error) = self.error_message.lock().unwrap().as_ref() {
-                    ui.add_space(10.0);
-                    ui.colored_label(egui::Color32::RED, error);
-                }
-                
-                ui.add_space(20.0);
-                ui.separator();
-                ui.add_space(10.0);
-                
-                // 帮助信息
-                ui.label("💡 提示:");
-                ui.label("启用/禁用后建议刷新 DNS 缓存");
-                if cfg!(target_os = "windows") {
-                    ui.label("命令: ipconfig /flushdns");
-                }
-                
-                ui.add_space(10.0);
-                ui.label(format!("hosts 文件位置: {}", hosts::get_hosts_path()));
-                
-                ui.add_space(20.0);
-                
-                // 刷新DNS按钮
-                if ui.button("🔄 刷新 DNS 缓存").clicked() && cfg!(target_os = "windows") {
-                    self.flush_dns();
-                }
+                ui.add_space(15.0);
             });
         });
     }
@@ -170,19 +240,59 @@ impl GitHubAcceleratorApp {
             }
         }
     }
+    
+    fn open_hosts_folder(&mut self) {
+        if cfg!(target_os = "windows") {
+            let _ = std::process::Command::new("explorer")
+                .arg("C:\\Windows\\System32\\drivers\\etc")
+                .spawn();
+            *self.status_message.lock().unwrap() = "已打开 hosts 文件目录".to_string();
+        }
+    }
 }
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([500.0, 550.0])
-            .with_resizable(false),
+            .with_inner_size([520.0, 600.0])
+            .with_resizable(false)
+            .with_decorations(true),
         ..Default::default()
     };
     
     eframe::run_native(
         "GitHub 访问加速工具",
         options,
-        Box::new(|_cc| Box::new(GitHubAcceleratorApp::default())),
+        Box::new(|cc| {
+            // Setup Chinese font support
+            setup_custom_fonts(&cc.egui_ctx);
+            Box::new(GitHubAcceleratorApp::default())
+        }),
     )
+}
+
+fn setup_custom_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    
+    // Add Chinese font support (using system built-in Microsoft YaHei)
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(font_data) = std::fs::read("C:\\Windows\\Fonts\\msyh.ttc") {
+            fonts.font_data.insert(
+                "msyh".to_owned(),
+                egui::FontData::from_owned(font_data),
+            );
+            
+            // Set Microsoft YaHei as default font
+            fonts.families.get_mut(&egui::FontFamily::Proportional)
+                .unwrap()
+                .insert(0, "msyh".to_owned());
+            
+            fonts.families.get_mut(&egui::FontFamily::Monospace)
+                .unwrap()
+                .push("msyh".to_owned());
+        }
+    }
+    
+    ctx.set_fonts(fonts);
 }

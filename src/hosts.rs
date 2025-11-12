@@ -7,7 +7,7 @@ const HOSTS_PATH_UNIX: &str = "/etc/hosts";
 const MARKER_START: &str = "# === FREE_TO_GITHUB START ===";
 const MARKER_END: &str = "# === FREE_TO_GITHUB END ===";
 
-// GitHub 相关域名和IP映射
+// GitHub domain and IP mapping
 const GITHUB_HOSTS: &[(&str, &str)] = &[
     ("140.82.113.4", "github.com"),
     ("140.82.114.4", "gist.github.com"),
@@ -97,7 +97,7 @@ pub fn disable() -> io::Result<()> {
         }
     }
 
-    // 移除末尾的空行
+    // Remove trailing empty lines
     while new_lines.last().map_or(false, |l| l.trim().is_empty()) {
         new_lines.pop();
     }
@@ -111,16 +111,16 @@ pub fn disable() -> io::Result<()> {
 pub fn check_permission() -> Result<(), String> {
     let hosts_path = get_hosts_path();
     if !Path::new(hosts_path).exists() {
-        return Err(format!("hosts 文件不存在: {}", hosts_path));
+        return Err(format!("hosts file does not exist: {}", hosts_path));
     }
 
     match OpenOptions::new().append(true).open(hosts_path) {
         Ok(_) => Ok(()),
         Err(_) => {
             if cfg!(target_os = "windows") {
-                Err("没有权限修改 hosts 文件!\n请以管理员身份运行此程序".to_string())
+                Err("No permission to modify hosts file!\nPlease run as administrator".to_string())
             } else {
-                Err("没有权限修改 hosts 文件!\n请使用 sudo 运行此程序".to_string())
+                Err("No permission to modify hosts file!\nPlease run with sudo".to_string())
             }
         }
     }
