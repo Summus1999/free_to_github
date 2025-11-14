@@ -2,13 +2,18 @@
 
 use eframe::egui;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use free_to_github::hosts;
+
+// Cache duration for status checks (in seconds)
+const STATUS_CACHE_DURATION: u64 = 2;
 
 struct GitHubAcceleratorApp {
     status_message: Arc<Mutex<String>>,
     is_enabled: Arc<Mutex<bool>>,
     has_permission: Arc<Mutex<bool>>,
     error_message: Arc<Mutex<Option<String>>>,
+    last_status_check: Arc<Mutex<Instant>>,
 }
 
 impl Default for GitHubAcceleratorApp {
@@ -25,12 +30,27 @@ impl Default for GitHubAcceleratorApp {
             is_enabled: Arc::new(Mutex::new(is_enabled)),
             has_permission: Arc::new(Mutex::new(has_permission)),
             error_message: Arc::new(Mutex::new(None)),
+            last_status_check: Arc::new(Mutex::new(Instant::now())),
         }
     }
 }
 
 impl eframe::App for GitHubAcceleratorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Optimized: Only check status periodically, not on every frame
+        let should_check = {
+            let last_check = self.last_status_check.lock().unwrap();
+            last_check.elapsed() > Duration::from_secs(STATUS_CACHE_DURATION)
+        };
+        
+        if should_check {
+            // Update status cache
+            if let Ok(enabled) = hosts::is_enabled() {
+                *self.is_enabled.lock().unwrap() = enabled;
+            }
+            *self.last_status_check.lock().unwrap() = Instant::now();
+        }
+        
         // Set dark theme
         ctx.set_visuals(egui::Visuals::dark());
         
@@ -154,30 +174,44 @@ impl eframe::App for GitHubAcceleratorApp {
                 
                 // Function button area
                 ui.horizontal(|ui| {
-                    ui.add_space(100.0);
+                    ui.add_space(50.0);
                     
                     let dns_btn = egui::Button::new(
                         egui::RichText::new("🔄 刷新 DNS")
                             .size(14.0)
                     )
                     .fill(egui::Color32::from_rgb(60, 120, 180))
-                    .min_size(egui::vec2(120.0, 35.0));
+                    .min_size(egui::vec2(110.0, 35.0));
                     
                     if ui.add(dns_btn).clicked() && cfg!(target_os = "windows") {
                         self.flush_dns();
                     }
                     
-                    ui.add_space(15.0);
+                    ui.add_space(10.0);
                     
                     let hosts_btn = egui::Button::new(
                         egui::RichText::new("📂 打开 Hosts")
                             .size(14.0)
                     )
                     .fill(egui::Color32::from_rgb(100, 100, 120))
-                    .min_size(egui::vec2(120.0, 35.0));
+                    .min_size(egui::vec2(110.0, 35.0));
                     
                     if ui.add(hosts_btn).clicked() && cfg!(target_os = "windows") {
                         self.open_hosts_folder();
+                    }
+                    
+                    ui.add_space(10.0);
+                    
+                    let github_btn = egui::Button::new(
+                        egui::RichText::new("🔗 跳转到 GitHub")
+                            .size(14.0)
+                            .color(if is_enabled { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                    )
+                    .fill(if is_enabled { egui::Color32::from_rgb(70, 120, 200) } else { egui::Color32::from_rgb(50, 50, 60) })
+                    .min_size(egui::vec2(130.0, 35.0));
+                    
+                    if ui.add_enabled(is_enabled, github_btn).clicked() {
+                        self.open_github();
                     }
                 });
                 
@@ -198,11 +232,13 @@ impl eframe::App for GitHubAcceleratorApp {
 
 impl GitHubAcceleratorApp {
     fn enable_acceleration(&mut self) {
+        // Immediate status update for better UX
         match hosts::enable() {
             Ok(_) => {
                 *self.is_enabled.lock().unwrap() = true;
                 *self.status_message.lock().unwrap() = "✓ 加速已启用!".to_string();
                 *self.error_message.lock().unwrap() = None;
+                *self.last_status_check.lock().unwrap() = Instant::now();
             }
             Err(e) => {
                 *self.error_message.lock().unwrap() = Some(format!("启用失败: {}", e));
@@ -212,11 +248,13 @@ impl GitHubAcceleratorApp {
     }
     
     fn disable_acceleration(&mut self) {
+        // Immediate status update for better UX
         match hosts::disable() {
             Ok(_) => {
                 *self.is_enabled.lock().unwrap() = false;
                 *self.status_message.lock().unwrap() = "✓ 加速已禁用!".to_string();
                 *self.error_message.lock().unwrap() = None;
+                *self.last_status_check.lock().unwrap() = Instant::now();
             }
             Err(e) => {
                 *self.error_message.lock().unwrap() = Some(format!("禁用失败: {}", e));
@@ -247,6 +285,31 @@ impl GitHubAcceleratorApp {
                 .spawn();
             *self.status_message.lock().unwrap() = "已打开 hosts 文件目录".to_string();
         }
+    }
+    
+    fn open_github(&mut self) {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("cmd")
+                .args(&["/C", "start", "https://github.com"])
+                .spawn();
+        }
+        
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("xdg-open")
+                .arg("https://github.com")
+                .spawn();
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open")
+                .arg("https://github.com")
+                .spawn();
+        }
+        
+        *self.status_message.lock().unwrap() = "正在打开 GitHub...".to_string();
     }
 }
 
