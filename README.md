@@ -44,15 +44,17 @@ cargo build --release --bin free_to_github_gui
 
 ### GUI 版本
 
-<img src="https://via.placeholder.com/500x600/1a1a1a/00dc78?text=GUI+Screenshot" alt="GUI界面" width="400"/>
+![GUI界面](https://via.placeholder.com/500x600/1a1a1a/00dc78?text=GUI+Screenshot)
 
 **界面功能**:
+
 - 🟢 **启用加速** - 一键开启 GitHub 访问优化
 - 🔴 **禁用加速** - 恢复原始 hosts 配置
 - 🔄 **刷新 DNS** - 清除系统 DNS 缓存
 - 📂 **打开 Hosts** - 快速访问 hosts 文件目录
 
 **注意事项**:
+
 - ✅ 程序会自动请求管理员权限
 - ✅ 首次启用后建议刷新 DNS 缓存
 - ✅ 支持实时状态显示
@@ -77,7 +79,7 @@ free_to_github_cli status
 
 本工具通过修改系统 hosts 文件,将 GitHub 相关域名解析到可访问的 IP 地址:
 
-```
+```text
 140.82.113.4    github.com
 185.199.108.153 assets-cdn.github.com
 185.199.108.133 raw.githubusercontent.com
@@ -85,10 +87,12 @@ free_to_github_cli status
 ```
 
 **Hosts 文件位置**:
+
 - Windows: `C:\Windows\System32\drivers\etc\hosts`
 - Linux/macOS: `/etc/hosts`
 
 **优势**:
+
 - ✅ 无需安装额外软件或配置代理
 - ✅ 不经过第三方服务器,保护隐私
 - ✅ 对系统其他网络访问无影响
@@ -121,13 +125,14 @@ EOF
 ### 编译优化
 
 项目已配置 Release 编译优化:
+
 - LTO (Link Time Optimization)
 - 代码精简 (strip)
 - 最小体积优化 (opt-level = "z")
 
 ### 项目结构
 
-```
+```text
 free_to_github/
 ├── src/
 │   ├── main.rs          # CLI 入口

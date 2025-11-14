@@ -1,6 +1,6 @@
 mod hosts;
 
-use hosts::{enable, disable, is_enabled, check_permission, get_hosts_path};
+use hosts::{enable, disable, is_enabled, check_permission};
 
 fn enable_cmd() -> std::io::Result<()> {
     enable()?;
