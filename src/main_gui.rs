@@ -1,9 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod hosts;
-
 use eframe::egui;
 use std::sync::{Arc, Mutex};
+use free_to_github::hosts;
 
 struct GitHubAcceleratorApp {
     status_message: Arc<Mutex<String>>,

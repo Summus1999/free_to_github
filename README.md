@@ -100,11 +100,18 @@ free_to_github_cli status
 
 ## 🛠️ 技术栈
 
-- **Rust** - 系统级编程语言,安全高效
-- **egui + eframe** - 纯 Rust 的即时模式 GUI 框架
-- **Rust 标准库** - 核心功能零外部依赖
+- **Rust 2021 Edition** - 系统级编程语言,安全高效
+- **egui 0.24 + eframe 0.24** - 纯 Rust 的即时模式 GUI 框架
+- **winapi** - Windows 系统 API 调用(仅 Windows 平台)
+- **embed-resource** - 嵌入管理员权限清单
 
-## 🔧 开发
+## 🔧 开发指南
+
+### 环境要求
+
+- **Rust**: 1.91 或更高版本
+- **系统**: Windows / Linux / macOS
+- **权限**: 构建无需特殊权限,运行需要管理员/root 权限
 
 ### 国内镜像加速
 
@@ -126,22 +133,151 @@ EOF
 
 项目已配置 Release 编译优化:
 
-- LTO (Link Time Optimization)
-- 代码精简 (strip)
-- 最小体积优化 (opt-level = "z")
+- **LTO** - 链接时优化 (Link Time Optimization)
+- **strip = true** - 移除调试符号,减小体积
+- **opt-level = "z"** - 优化体积最小化
+- **codegen-units = 1** - 单代码生成单元,提升优化效果
+
+编译命令:
+
+```bash
+# 编译所有目标
+cargo build --release --all-targets
+
+# 仅编译 GUI 版本
+cargo build --release --bin free_to_github_gui
+
+# 仅编译 CLI 版本
+cargo build --release --bin free_to_github_cli
+```
 
 ### 项目结构
 
 ```text
 free_to_github/
 ├── src/
-│   ├── main.rs          # CLI 入口
-│   ├── main_gui.rs      # GUI 入口
+│   ├── lib.rs           # 库入口,导出 hosts 模块
+│   ├── main.rs          # CLI 二进制入口
+│   ├── main_gui.rs      # GUI 二进制入口
 │   └── hosts.rs         # Hosts 文件操作核心逻辑
 ├── build.rs             # 构建脚本(嵌入管理员权限清单)
-├── Cargo.toml           # 项目配置
+├── Cargo.toml           # 项目配置与依赖管理
+├── README.md            # 项目文档
 └── *.bat                # Windows 便捷脚本
 ```
+
+### 核心功能模块
+
+**`src/hosts.rs`** - Hosts 文件操作核心:
+
+- `enable()` - 启用 GitHub 加速,在 hosts 文件末尾添加标记区域
+- `disable()` - 禁用加速,移除标记区域内容
+- `is_enabled()` - 检查当前是否已启用
+- `check_permission()` - 验证是否有修改 hosts 文件的权限
+- `get_hosts_path()` - 跨平台获取 hosts 文件路径
+
+**`src/main_gui.rs`** - GUI 界面实现:
+
+- 使用 `egui` 框架构建现代化界面
+- 支持中文字体自动加载(微软雅黑)
+- 实时权限检测和状态显示
+- DNS 缓存刷新、Hosts 目录快捷打开
+
+**`src/main.rs`** - CLI 命令行实现:
+
+- 简洁的命令行接口
+- 支持 `enable`/`disable`/`status`/`help` 命令
+- 跨平台 DNS 刷新提示
+
+### 开发流程
+
+1. **Fork 并克隆项目**
+
+   ```bash
+   git clone https://github.com/your-username/free_to_github.git
+   cd free_to_github
+   ```
+
+2. **安装依赖**
+
+   ```bash
+   cargo build
+   ```
+
+3. **运行测试**
+
+   ```bash
+   # 测试 GUI
+   cargo run --bin free_to_github_gui
+   
+   # 测试 CLI
+   cargo run --bin free_to_github_cli -- help
+   ```
+
+4. **代码检查**
+
+   ```bash
+   # 检查编译错误
+   cargo check --all-targets
+   
+   # 代码格式化
+   cargo fmt
+   
+   # Lint 检查
+   cargo clippy -- -D warnings
+   ```
+
+5. **提交 Pull Request**
+
+### 调试技巧
+
+在 Debug 模式下,GUI 版本会显示控制台窗口以便调试:
+
+```bash
+cargo run --bin free_to_github_gui
+```
+
+## 📦 发布说明
+
+生成的可执行文件位于 `target/release/` 目录:
+
+- `free_to_github_gui.exe` - GUI 版本 (~3.2 MB)
+- `free_to_github_cli.exe` - CLI 版本 (~150 KB)
+
+## ❓ 常见问题
+
+### Q: 为什么需要管理员权限?
+
+A: 修改系统 hosts 文件需要管理员权限。Windows 上双击 GUI 版本会自动请求权限,CLI 版本需要手动以管理员身份运行。
+
+### Q: 启用后仍然无法访问 GitHub?
+
+A: 请尝试以下步骤:
+
+1. 点击「刷新 DNS」按钮或运行 `ipconfig /flushdns`
+2. 重启浏览器
+3. 检查是否有防火墙/安全软件阻止
+4. 尝试禁用后重新启用
+
+### Q: 会不会影响其他网站访问?
+
+A: 不会。本工具仅修改 GitHub 相关域名的解析,不会影响其他网站。
+
+### Q: IP 地址会过时吗?
+
+A: GitHub 的 IP 地址相对稳定,但确实可能变化。如果发现无法访问,可关注项目更新获取最新 IP。
+
+### Q: 如何卸载?
+
+A: 点击「禁用加速」按钮恢复 hosts 文件,然后直接删除程序即可。
+
+## 💌 最佳实践
+
+1. **首次使用**: 启用后务必刷新 DNS 缓存
+2. **定期检查**: 建议定期检查项目更新,获取最新 IP 地址
+3. **备份 hosts**: 首次使用前建议备份原始 hosts 文件
+4. **不同网络**: 在不同网络环境下效果可能有差异
+5. **安全软件**: 确保安全软件不会阻止 hosts 文件修改
 
 ## 📝 许可证
 

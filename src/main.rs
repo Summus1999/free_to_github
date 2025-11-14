@@ -1,6 +1,4 @@
-mod hosts;
-
-use hosts::{enable, disable, is_enabled, check_permission};
+use free_to_github::hosts::{enable, disable, is_enabled, check_permission};
 
 fn enable_cmd() -> std::io::Result<()> {
     enable()?;

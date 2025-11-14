@@ -111,16 +111,16 @@ pub fn disable() -> io::Result<()> {
 pub fn check_permission() -> Result<(), String> {
     let hosts_path = get_hosts_path();
     if !Path::new(hosts_path).exists() {
-        return Err(format!("hosts file does not exist: {}", hosts_path));
+        return Err(format!("hosts 文件不存在: {}", hosts_path));
     }
 
     match OpenOptions::new().append(true).open(hosts_path) {
         Ok(_) => Ok(()),
         Err(_) => {
             if cfg!(target_os = "windows") {
-                Err("No permission to modify hosts file!\nPlease run as administrator".to_string())
+                Err("没有权限修改 hosts 文件!\n请以管理员身份运行此程序".to_string())
             } else {
-                Err("No permission to modify hosts file!\nPlease run with sudo".to_string())
+                Err("没有权限修改 hosts 文件!\n请使用 sudo 运行此程序".to_string())
             }
         }
     }

@@ -2,6 +2,10 @@
 name = "free_to_github"
 version = "0.1.0"
 edition = "2021"
+authors = ["Your Name"]
+description = "A local GitHub access acceleration tool without third-party servers"
+license = "Apache-2.0"
+repository = "https://github.com/your-username/free_to_github"
 
 [dependencies]
 eframe = "0.24"
@@ -19,6 +23,10 @@ strip = true
 opt-level = "z"
 lto = true
 codegen-units = 1
+
+[lib]
+name = "free_to_github"
+path = "src/lib.rs"
 
 [[bin]]
 name = "free_to_github_gui"

@@ -7,7 +7,10 @@ fn main() {
 "#;
         
         // Create temporary .rc file
-        std::fs::write("app.rc", manifest).unwrap();
+        if let Err(e) = std::fs::write("app.rc", manifest) {
+            eprintln!("Warning: Failed to write app.rc: {}", e);
+            return;
+        }
         
         // Compile resource file using embed-resource
         embed_resource::compile("app.rc", embed_resource::NONE);
