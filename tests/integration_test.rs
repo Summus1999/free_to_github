@@ -14,17 +14,45 @@ fn init_logger() {
 fn test_github_connection_performance() {
     init_logger();
     
+    #[cfg(debug_assertions)]
+    log::info!("=== Starting GitHub connection diagnostic test ===");
+    
     // Test connection to github.com
     let start = Instant::now();
     
-    match TcpStream::connect_timeout(
-        &"140.82.113.4:443".parse().unwrap(),
-        Duration::from_secs(2),
-    ) {
+    #[cfg(debug_assertions)]
+    log::info!("Attempting to connect to github.com:443 (140.82.113.4:443)");
+    
+    let dns_start = Instant::now();
+    let addr = match "140.82.113.4:443".parse() {
+        Ok(a) => {
+            #[cfg(debug_assertions)]
+            log::info!("Address parsing took {} µs", dns_start.elapsed().as_micros());
+            a
+        }
+        Err(e) => {
+            #[cfg(debug_assertions)]
+            log::error!("Failed to parse address: {}", e);
+            return;
+        }
+    };
+    
+    let connect_start = Instant::now();
+    match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
         Ok(_stream) => {
-            let elapsed = start.elapsed();
-            let duration_ms = elapsed.as_millis();
-            println!("GitHub connection time: {:?}", elapsed);
+            let total_elapsed = start.elapsed();
+            let connect_elapsed = connect_start.elapsed();
+            let duration_ms = total_elapsed.as_millis();
+            
+            #[cfg(debug_assertions)]
+            {
+                log::info!("✓ TCP connection established");
+                log::info!("Connection handshake time: {} ms", connect_elapsed.as_millis());
+                log::info!("Total connection time: {} ms", duration_ms);
+                log::info!("Connection status: SUCCESS");
+            }
+            
+            println!("GitHub connection time: {:?}", total_elapsed);
             println!("Connection millis: {}", duration_ms);
             
             logger::log_connection_metrics("github.com:443", duration_ms, true);
@@ -33,15 +61,34 @@ fn test_github_connection_performance() {
             assert!(
                 duration_ms < 1000,
                 "GitHub connection should complete within 1000ms, took: {:?}",
-                elapsed
+                total_elapsed
             );
         }
         Err(e) => {
+            let elapsed = start.elapsed();
+            let elapsed_ms = elapsed.as_millis();
+            
+            #[cfg(debug_assertions)]
+            {
+                log::warn!("✗ TCP connection failed");
+                log::warn!("Error type: {}", e);
+                log::warn!("Time elapsed before timeout: {} ms", elapsed_ms);
+                log::warn!("Error details: {:?}", e.kind());
+                log::warn!("Possible causes:");
+                log::warn!("  - Network unreachable");
+                log::warn!("  - Firewall blocking connection");
+                log::warn!("  - GitHub server not responding");
+                log::warn!("  - DNS resolution failed");
+            }
+            
             println!("Connection failed (may be offline): {}", e);
-            logger::log_connection_metrics("github.com:443", start.elapsed().as_millis(), false);
+            logger::log_connection_metrics("github.com:443", elapsed_ms, false);
             // Don't fail test if network is unavailable
         }
     }
+    
+    #[cfg(debug_assertions)]
+    log::info!("=== GitHub connection diagnostic test complete ===");
 }
 
 /// Test multiple rapid connections
@@ -49,10 +96,17 @@ fn test_github_connection_performance() {
 fn test_rapid_github_connections() {
     init_logger();
     
+    #[cfg(debug_assertions)]
+    log::info!("=== Starting rapid connection test (5 attempts) ===");
+    
     let start = Instant::now();
     let mut success_count = 0;
+    let mut total_time = 0u128;
     
     for i in 0..5 {
+        #[cfg(debug_assertions)]
+        log::info!("Attempt {}: Starting connection...", i + 1);
+        
         let conn_start = Instant::now();
         match TcpStream::connect_timeout(
             &"140.82.113.4:443".parse().unwrap(),
@@ -61,6 +115,11 @@ fn test_rapid_github_connections() {
             Ok(_) => {
                 let elapsed = conn_start.elapsed();
                 let duration_ms = elapsed.as_millis();
+                total_time += duration_ms;
+                
+                #[cfg(debug_assertions)]
+                log::info!("Attempt {}: ✓ SUCCESS - {} ms", i + 1, duration_ms);
+                
                 println!("Connection {} took: {:?}", i + 1, elapsed);
                 logger::log_connection_metrics(
                     &format!("github.com:443 (attempt {})", i + 1),
@@ -71,6 +130,11 @@ fn test_rapid_github_connections() {
             }
             Err(e) => {
                 let duration_ms = conn_start.elapsed().as_millis();
+                total_time += duration_ms;
+                
+                #[cfg(debug_assertions)]
+                log::warn!("Attempt {}: ✗ FAILED - {} ms - Error: {}", i + 1, duration_ms, e);
+                
                 println!("Connection {} failed: {}", i + 1, e);
                 logger::log_connection_metrics(
                     &format!("github.com:443 (attempt {})", i + 1),
@@ -82,6 +146,24 @@ fn test_rapid_github_connections() {
     }
     
     let total_elapsed = start.elapsed();
+    
+    #[cfg(debug_assertions)]
+    {
+        log::info!("=== Rapid connection test results ===");
+        log::info!("Total attempts: 5");
+        log::info!("Successful: {}", success_count);
+        log::info!("Failed: {}", 5 - success_count);
+        log::info!("Success rate: {}/5", success_count);
+        log::info!("Total elapsed time: {} ms", total_elapsed.as_millis());
+        if success_count > 0 {
+            let avg_time = total_time / success_count as u128;
+            log::info!("Average connection time: {} ms", avg_time);
+            if avg_time > 1000 {
+                log::warn!("WARNING: Average connection time exceeds 1 second (performance issue)");
+            }
+        }
+    }
+    
     println!(
         "Total time for 5 connections: {:?}, Success rate: {}/5",
         total_elapsed, success_count

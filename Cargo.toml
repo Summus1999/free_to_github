@@ -27,6 +27,10 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 
+# Debug 模式也隐藏控制台窗口
+[profile.dev]
+opt-level = 0
+
 [lib]
 name = "free_to_github"
 path = "src/lib.rs"

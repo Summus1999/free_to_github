@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![windows_subsystem = "windows"]
 
 use eframe::egui;
 use std::sync::{Arc, Mutex};
@@ -54,90 +54,67 @@ impl eframe::App for GitHubAcceleratorApp {
             *self.last_status_check.lock().unwrap() = Instant::now();
         }
         
-        // Set dark theme
-        ctx.set_visuals(egui::Visuals::dark());
+        // Set custom theme with sky blue background
+        let mut visuals = egui::Visuals::dark();
+        visuals.panel_fill = egui::Color32::from_rgb(25, 50, 100);  // Dark sky blue background
+        visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(25, 50, 100);  // Remove group borders
+        visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::TRANSPARENT;  // Transparent text stroke
+        ctx.set_visuals(visuals);
         
         egui::CentralPanel::default().show(ctx, |ui| {
+            // Set background color to sky blue
+            ui.style_mut().visuals.panel_fill = egui::Color32::from_rgb(25, 50, 100);
+            
             ui.vertical_centered(|ui| {
+                ui.add_space(35.0);
+                
+                // Title area - cleaner design
+                ui.heading(egui::RichText::new("🚀 GitHub 加速").size(36.0).color(egui::Color32::from_rgb(100, 220, 255)));
                 ui.add_space(30.0);
                 
-                // Title area with gradient effect
-                ui.group(|ui| {
-                    ui.set_min_width(450.0);
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(15.0);
-                        ui.heading(egui::RichText::new("🚀 GitHub 访问加速工具")
-                            .size(28.0)
-                            .color(egui::Color32::from_rgb(100, 200, 255)));
-                        ui.add_space(8.0);
-                        ui.label(egui::RichText::new("无需第三方服务器")
-                            .size(13.0)
-                            .color(egui::Color32::LIGHT_GRAY));
-                        ui.add_space(15.0);
-                    });
-                });
-                
-                ui.add_space(25.0);
-                
-                // Permission check - warning box
+                // Permission check - warning box (no visible border)
                 let has_permission = *self.has_permission.lock().unwrap();
                 if !has_permission {
-                    ui.group(|ui| {
-                        ui.set_min_width(450.0);
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("⚠️")
-                                .size(24.0)
-                                .color(egui::Color32::from_rgb(255, 180, 0)));
-                            ui.vertical(|ui| {
-                                ui.label(egui::RichText::new("没有管理员权限")
-                                    .size(16.0)
-                                    .color(egui::Color32::from_rgb(255, 180, 0)));
-                                ui.label(egui::RichText::new("请以管理员身份运行此程序")
-                                    .size(12.0)
-                                    .color(egui::Color32::LIGHT_GRAY));
-                            });
+                    ui.horizontal(|ui| {
+                        ui.add_space(100.0);
+                        ui.label(egui::RichText::new("⚠️").size(24.0));
+                        ui.vertical(|ui| {
+                            ui.label(egui::RichText::new("需要管理员权限").size(15.0).color(egui::Color32::from_rgb(255, 200, 100)));
+                            ui.label(egui::RichText::new("请以管理员身份运行").size(11.0).color(egui::Color32::from_rgb(200, 200, 200)));
                         });
+                        ui.add_space(100.0);
                     });
-                    ui.add_space(20.0);
+                    ui.add_space(25.0);
                 }
                 
-                // Status display area - card style
+                // Status display - card style (no border)
                 let is_enabled = *self.is_enabled.lock().unwrap();
-                let (status_text, status_icon, status_color, _bg_color) = if is_enabled {
-                    ("加速已启用", "✅", egui::Color32::from_rgb(0, 220, 120), egui::Color32::from_rgb(20, 60, 40))
+                let (status_text, status_icon, status_color) = if is_enabled {
+                    ("已启用", "✅", egui::Color32::from_rgb(100, 255, 150))
                 } else {
-                    ("加速未启用", "⭕", egui::Color32::from_rgb(150, 150, 150), egui::Color32::from_rgb(40, 40, 45))
+                    ("未启用", "⭕", egui::Color32::from_rgb(180, 180, 180))
                 };
                 
-                ui.group(|ui| {
-                    ui.set_min_width(450.0);
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(20.0);
-                        ui.label(egui::RichText::new(status_icon)
-                            .size(48.0));
-                        ui.add_space(10.0);
-                        ui.label(egui::RichText::new(status_text)
-                            .size(22.0)
-                            .color(status_color)
-                            .strong());
-                        ui.add_space(20.0);
-                    });
+                ui.vertical_centered(|ui| {
+                    ui.add_space(25.0);
+                    ui.label(egui::RichText::new(status_icon).size(56.0));
+                    ui.add_space(12.0);
+                    ui.label(egui::RichText::new(status_text).size(24.0).color(status_color).strong());
+                    ui.add_space(25.0);
                 });
                 
-                ui.add_space(30.0);
+                ui.add_space(35.0);
                 
-                // Control button area - modern buttons
+                // Control buttons - modern design
                 ui.horizontal(|ui| {
-                    ui.add_space(80.0);
+                    ui.add_space(60.0);
                     
                     // Enable button
                     let enable_btn = egui::Button::new(
-                        egui::RichText::new("🟢 启用加速")
-                            .size(16.0)
-                            .color(if has_permission { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                        egui::RichText::new("🟢 启用").size(16.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(40, 180, 100))
-                    .min_size(egui::vec2(150.0, 50.0));
+                    .fill(egui::Color32::from_rgb(60, 180, 120))
+                    .min_size(egui::vec2(140.0, 50.0));
                     
                     if ui.add_enabled(has_permission, enable_btn).clicked() {
                         self.enable_acceleration();
@@ -147,84 +124,81 @@ impl eframe::App for GitHubAcceleratorApp {
                     
                     // Disable button
                     let disable_btn = egui::Button::new(
-                        egui::RichText::new("🔴 禁用加速")
-                            .size(16.0)
-                            .color(if has_permission { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                        egui::RichText::new("🔴 禁用").size(16.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(220, 80, 80))
-                    .min_size(egui::vec2(150.0, 50.0));
+                    .fill(egui::Color32::from_rgb(220, 100, 100))
+                    .min_size(egui::vec2(140.0, 50.0));
                     
                     if ui.add_enabled(has_permission, disable_btn).clicked() {
                         self.disable_acceleration();
                     }
                 });
                 
-                ui.add_space(25.0);
+                ui.add_space(30.0);
                 
-                // Error message
+                // Error message display
                 if let Some(error) = self.error_message.lock().unwrap().as_ref() {
                     ui.vertical_centered(|ui| {
-                        ui.label(egui::RichText::new(error)
-                            .size(13.0)
-                            .color(egui::Color32::from_rgb(255, 100, 100)));
+                        ui.label(egui::RichText::new(error).size(12.0).color(egui::Color32::from_rgb(255, 120, 120)));
                     });
                     ui.add_space(15.0);
                 }
                 
                 ui.add_space(20.0);
-                ui.separator();
-                ui.add_space(15.0);
                 
-                // Function button area
+                // Divider line (subtle)
+                ui.vertical_centered(|ui| {
+                    ui.label(egui::RichText::new("─────────────────").size(12.0).color(egui::Color32::from_rgb(50, 100, 150)));
+                });
+                ui.add_space(20.0);
+                
+                // Utility buttons area
                 ui.horizontal(|ui| {
-                    ui.add_space(50.0);
+                    ui.add_space(30.0);
                     
+                    // Refresh DNS button
                     let dns_btn = egui::Button::new(
-                        egui::RichText::new("🔄 刷新 DNS")
-                            .size(14.0)
+                        egui::RichText::new("🔄 刷新DNS").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(60, 120, 180))
-                    .min_size(egui::vec2(110.0, 35.0));
+                    .fill(egui::Color32::from_rgb(70, 140, 200))
+                    .min_size(egui::vec2(110.0, 38.0));
                     
                     if ui.add(dns_btn).clicked() && cfg!(target_os = "windows") {
                         self.flush_dns();
                     }
                     
-                    ui.add_space(10.0);
+                    ui.add_space(12.0);
                     
+                    // Open Hosts folder button
                     let hosts_btn = egui::Button::new(
-                        egui::RichText::new("📂 打开 Hosts")
-                            .size(14.0)
+                        egui::RichText::new("📂 Hosts").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(100, 100, 120))
-                    .min_size(egui::vec2(110.0, 35.0));
+                    .fill(egui::Color32::from_rgb(120, 120, 150))
+                    .min_size(egui::vec2(100.0, 38.0));
                     
                     if ui.add(hosts_btn).clicked() && cfg!(target_os = "windows") {
                         self.open_hosts_folder();
                     }
                     
-                    ui.add_space(10.0);
+                    ui.add_space(12.0);
                     
+                    // Open GitHub button
                     let github_btn = egui::Button::new(
-                        egui::RichText::new("🔗 跳转到 GitHub")
-                            .size(14.0)
-                            .color(if is_enabled { egui::Color32::WHITE } else { egui::Color32::GRAY })
+                        egui::RichText::new("🔗 GitHub").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(if is_enabled { egui::Color32::from_rgb(70, 120, 200) } else { egui::Color32::from_rgb(50, 50, 60) })
-                    .min_size(egui::vec2(130.0, 35.0));
+                    .fill(if is_enabled { egui::Color32::from_rgb(80, 140, 220) } else { egui::Color32::from_rgb(80, 80, 100) })
+                    .min_size(egui::vec2(110.0, 38.0));
                     
                     if ui.add_enabled(is_enabled, github_btn).clicked() {
                         self.open_github();
                     }
                 });
                 
-                ui.add_space(20.0);
+                ui.add_space(25.0);
                 
-                // Bottom info
+                // Footer tips
                 ui.vertical_centered(|ui| {
-                    ui.label(egui::RichText::new("💡 提示: 启用后建议刷新 DNS 缓存")
-                        .size(11.0)
-                        .color(egui::Color32::DARK_GRAY));
+                    ui.label(egui::RichText::new("💡 启用后建议刷新 DNS").size(10.0).color(egui::Color32::from_rgb(150, 150, 150)));
                 });
                 
                 ui.add_space(15.0);
