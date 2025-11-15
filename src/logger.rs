@@ -1,5 +1,7 @@
+#[cfg(debug_assertions)]
 use std::fs::OpenOptions;
 use std::io::Write;
+#[cfg(debug_assertions)]
 use std::path::PathBuf;
 use std::sync::Mutex;
 use log::{Level, Metadata, Record};
@@ -113,7 +115,7 @@ impl log::Log for FileLogger {
     }
 }
 
-/// Get the current timestamp as a formatted string
+/// Get the current timestamp as a formatted string (HH:MM:SS.mmm)
 fn chrono_time() -> String {
     use std::time::SystemTime;
     
@@ -121,12 +123,18 @@ fn chrono_time() -> String {
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default();
     
-    // Simple timestamp formatting without external dependencies
-    let secs = duration.as_secs();
+    // Convert to human-readable time format
+    let total_secs = duration.as_secs();
     let millis = duration.subsec_millis();
     
-    // Basic time formatting (not perfect but works for logging)
-    format!("{}.{:03}", secs, millis)
+    // Calculate hours, minutes, seconds from Unix timestamp
+    // Note: This is a simplified calculation in UTC timezone
+    let secs_today = total_secs % 86400;  // Seconds in a day
+    let hours = secs_today / 3600;
+    let minutes = (secs_today % 3600) / 60;
+    let seconds = secs_today % 60;
+    
+    format!("{:02}:{:02}:{:02}.{:03}", hours, minutes, seconds, millis)
 }
 
 /// Get home directory path (cross-platform)
@@ -149,39 +157,39 @@ fn dirs_home() -> PathBuf {
 
 /// Log connection performance metrics (only recorded in debug builds)
 pub fn log_connection_metrics(
-    target: &str,
-    duration_ms: u128,
-    success: bool,
+    _target: &str,
+    _duration_ms: u128,
+    _success: bool,
 ) {
     #[cfg(debug_assertions)]
     {
-        if success {
+        if _success {
             log::info!(
                 "Connection to {} completed in {} ms ✓",
-                target, duration_ms
+                _target, _duration_ms
             );
         } else {
             log::warn!(
                 "Connection to {} failed or timed out (took {} ms)",
-                target, duration_ms
+                _target, _duration_ms
             );
         }
     }
 }
 
 /// Log hosts file operation (only recorded in debug builds)
-pub fn log_hosts_operation(operation: &str, duration_ms: u128, success: bool) {
+pub fn log_hosts_operation(_operation: &str, _duration_ms: u128, _success: bool) {
     #[cfg(debug_assertions)]
     {
-        if success {
+        if _success {
             log::info!(
                 "Hosts {} operation completed in {} ms ✓",
-                operation, duration_ms
+                _operation, _duration_ms
             );
         } else {
             log::error!(
                 "Hosts {} operation failed (took {} ms)",
-                operation, duration_ms
+                _operation, _duration_ms
             );
         }
     }

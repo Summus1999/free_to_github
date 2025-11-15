@@ -17,6 +17,7 @@ struct GitHubAcceleratorApp {
     has_permission: Arc<Mutex<bool>>,
     error_message: Arc<Mutex<Option<String>>>,
     last_status_check: Arc<Mutex<Instant>>,
+    visuals_initialized: bool,  // Performance: avoid setting visuals every frame
 }
 
 impl Default for GitHubAcceleratorApp {
@@ -34,12 +35,29 @@ impl Default for GitHubAcceleratorApp {
             has_permission: Arc::new(Mutex::new(has_permission)),
             error_message: Arc::new(Mutex::new(None)),
             last_status_check: Arc::new(Mutex::new(Instant::now())),
+            visuals_initialized: false,
         }
     }
 }
 
 impl eframe::App for GitHubAcceleratorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Performance: Only set visuals once
+        if !self.visuals_initialized {
+            let mut visuals = egui::Visuals::dark();
+            visuals.panel_fill = egui::Color32::from_rgb(20, 40, 80);
+            visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(20, 40, 80);
+            visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::TRANSPARENT;
+            
+            // Enhanced button hover effects
+            visuals.widgets.hovered.weak_bg_fill = egui::Color32::from_rgba_premultiplied(255, 255, 255, 15);  // Subtle hover highlight
+            visuals.widgets.hovered.bg_fill = egui::Color32::from_rgba_premultiplied(255, 255, 255, 20);  // Hover brightness boost
+            visuals.widgets.active.bg_fill = egui::Color32::from_rgba_premultiplied(255, 255, 255, 25);  // Active/pressed state
+            
+            ctx.set_visuals(visuals);
+            self.visuals_initialized = true;
+        }
+        
         // Optimized: Only check status periodically, not on every frame
         let should_check = {
             let last_check = self.last_status_check.lock().unwrap();
@@ -54,26 +72,32 @@ impl eframe::App for GitHubAcceleratorApp {
             *self.last_status_check.lock().unwrap() = Instant::now();
         }
         
-        // Set custom theme with sky blue background
-        let mut visuals = egui::Visuals::dark();
-        visuals.panel_fill = egui::Color32::from_rgb(25, 50, 100);  // Dark sky blue background
-        visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(25, 50, 100);  // Remove group borders
-        visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::TRANSPARENT;  // Transparent text stroke
-        ctx.set_visuals(visuals);
+        // Performance: Cache frequently accessed values to avoid repeated locks
+        let has_permission = *self.has_permission.lock().unwrap();
+        let is_enabled = *self.is_enabled.lock().unwrap();
+        let error_message = self.error_message.lock().unwrap().clone();
         
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Set background color to sky blue
-            ui.style_mut().visuals.panel_fill = egui::Color32::from_rgb(25, 50, 100);
-            
             ui.vertical_centered(|ui| {
                 ui.add_space(35.0);
                 
-                // Title area - cleaner design
-                ui.heading(egui::RichText::new("🚀 GitHub 加速").size(36.0).color(egui::Color32::from_rgb(100, 220, 255)));
+                // Title area - precise alignment with icon and text
+                ui.horizontal(|ui| {
+                    ui.add_space(140.0);  // Center alignment
+                    
+                    // Rocket icon with baseline alignment
+                    ui.label(egui::RichText::new("🚀").size(36.0));
+                    ui.add_space(8.0);  // Small gap between icon and text
+                    
+                    // Title text - aligned with icon baseline
+                    ui.label(egui::RichText::new("GitHub 加速")
+                        .size(36.0)
+                        .color(egui::Color32::from_rgb(100, 220, 255))
+                        .strong());
+                });
                 ui.add_space(30.0);
                 
                 // Permission check - warning box (no visible border)
-                let has_permission = *self.has_permission.lock().unwrap();
                 if !has_permission {
                     ui.horizontal(|ui| {
                         ui.add_space(100.0);
@@ -87,20 +111,30 @@ impl eframe::App for GitHubAcceleratorApp {
                     ui.add_space(25.0);
                 }
                 
-                // Status display - card style (no border)
-                let is_enabled = *self.is_enabled.lock().unwrap();
+                // Status display - card style with gradient background
                 let (status_text, status_icon, status_color) = if is_enabled {
-                    ("已启用", "✅", egui::Color32::from_rgb(100, 255, 150))
+                    ("已启用", "✅", egui::Color32::from_rgb(120, 255, 160))  // Brighter, fresher green
                 } else {
-                    ("未启用", "⭕", egui::Color32::from_rgb(180, 180, 180))
+                    ("未启用", "⭕", egui::Color32::from_rgb(150, 150, 160))  // Adjusted gray
                 };
                 
                 ui.vertical_centered(|ui| {
-                    ui.add_space(25.0);
-                    ui.label(egui::RichText::new(status_icon).size(56.0));
-                    ui.add_space(12.0);
-                    ui.label(egui::RichText::new(status_text).size(24.0).color(status_color).strong());
-                    ui.add_space(25.0);
+                    // Create gradient effect with subtle background
+                    let frame = egui::Frame::default()
+                        .fill(egui::Color32::from_rgb(35, 65, 120))  // Lighter blue for card contrast
+                        .rounding(12.0)
+                        .inner_margin(egui::Margin::same(0.0));  // Remove default margin for precise control
+                    frame.show(ui, |ui| {
+                        ui.add_space(25.0);
+                        ui.label(egui::RichText::new(status_icon).size(56.0));
+                        ui.add_space(12.0);
+                        // Enhanced status text - larger font, heavier weight
+                        ui.label(egui::RichText::new(status_text)
+                            .size(28.0)  // Increased from 24.0 for better prominence
+                            .color(status_color)
+                            .strong());
+                        ui.add_space(25.0);
+                    });
                 });
                 
                 ui.add_space(35.0);
@@ -109,11 +143,12 @@ impl eframe::App for GitHubAcceleratorApp {
                 ui.horizontal(|ui| {
                     ui.add_space(60.0);
                     
-                    // Enable button
+                    // Enable button - vibrant fresh green with rounded corners
                     let enable_btn = egui::Button::new(
                         egui::RichText::new("🟢 启用").size(16.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(60, 180, 120))
+                    .fill(egui::Color32::from_rgb(76, 200, 130))  // More saturated, vibrant green
+                    .rounding(8.0)  // Rounded corners
                     .min_size(egui::vec2(140.0, 50.0));
                     
                     if ui.add_enabled(has_permission, enable_btn).clicked() {
@@ -122,11 +157,12 @@ impl eframe::App for GitHubAcceleratorApp {
                     
                     ui.add_space(20.0);
                     
-                    // Disable button
+                    // Disable button - bold alert red with rounded corners
                     let disable_btn = egui::Button::new(
                         egui::RichText::new("🔴 禁用").size(16.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(220, 100, 100))
+                    .fill(egui::Color32::from_rgb(235, 85, 100))  // More vibrant, alert red
+                    .rounding(8.0)  // Rounded corners
                     .min_size(egui::vec2(140.0, 50.0));
                     
                     if ui.add_enabled(has_permission, disable_btn).clicked() {
@@ -137,7 +173,7 @@ impl eframe::App for GitHubAcceleratorApp {
                 ui.add_space(30.0);
                 
                 // Error message display
-                if let Some(error) = self.error_message.lock().unwrap().as_ref() {
+                if let Some(error) = error_message.as_ref() {
                     ui.vertical_centered(|ui| {
                         ui.label(egui::RichText::new(error).size(12.0).color(egui::Color32::from_rgb(255, 120, 120)));
                     });
@@ -152,42 +188,45 @@ impl eframe::App for GitHubAcceleratorApp {
                 });
                 ui.add_space(20.0);
                 
-                // Utility buttons area
+                // Utility buttons area - improved spacing and rounded corners
                 ui.horizontal(|ui| {
-                    ui.add_space(30.0);
+                    ui.add_space(50.0);  // Better left spacing
                     
-                    // Refresh DNS button
+                    // Refresh DNS button - tech blue with rounded corners
                     let dns_btn = egui::Button::new(
                         egui::RichText::new("🔄 刷新DNS").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(70, 140, 200))
-                    .min_size(egui::vec2(110.0, 38.0));
+                    .fill(egui::Color32::from_rgb(85, 155, 215))  // Brighter tech blue
+                    .rounding(8.0)  // Rounded corners for harmony
+                    .min_size(egui::vec2(110.0, 40.0));  // Slightly taller
                     
                     if ui.add(dns_btn).clicked() && cfg!(target_os = "windows") {
                         self.flush_dns();
                     }
                     
-                    ui.add_space(12.0);
+                    ui.add_space(18.0);  // Increased spacing between buttons
                     
-                    // Open Hosts folder button
+                    // Open Hosts folder button - tech purple with rounded corners
                     let hosts_btn = egui::Button::new(
                         egui::RichText::new("📂 Hosts").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(120, 120, 150))
-                    .min_size(egui::vec2(100.0, 38.0));
+                    .fill(egui::Color32::from_rgb(140, 130, 170))  // Enhanced tech purple
+                    .rounding(8.0)  // Rounded corners for harmony
+                    .min_size(egui::vec2(100.0, 40.0));  // Slightly taller
                     
                     if ui.add(hosts_btn).clicked() && cfg!(target_os = "windows") {
                         self.open_hosts_folder();
                     }
                     
-                    ui.add_space(12.0);
+                    ui.add_space(18.0);  // Increased spacing between buttons
                     
-                    // Open GitHub button
+                    // Open GitHub button - context-aware color with rounded corners
                     let github_btn = egui::Button::new(
                         egui::RichText::new("🔗 GitHub").size(13.0).color(egui::Color32::WHITE)
                     )
-                    .fill(if is_enabled { egui::Color32::from_rgb(80, 140, 220) } else { egui::Color32::from_rgb(80, 80, 100) })
-                    .min_size(egui::vec2(110.0, 38.0));
+                    .fill(if is_enabled { egui::Color32::from_rgb(100, 160, 240) } else { egui::Color32::from_rgb(100, 100, 120) })  // Brighter when enabled
+                    .rounding(8.0)  // Rounded corners for harmony
+                    .min_size(egui::vec2(110.0, 40.0));  // Slightly taller
                     
                     if ui.add_enabled(is_enabled, github_btn).clicked() {
                         self.open_github();
@@ -196,9 +235,11 @@ impl eframe::App for GitHubAcceleratorApp {
                 
                 ui.add_space(25.0);
                 
-                // Footer tips
+                // Footer tips - softer color for subtle hint
                 ui.vertical_centered(|ui| {
-                    ui.label(egui::RichText::new("💡 启用后建议刷新 DNS").size(10.0).color(egui::Color32::from_rgb(150, 150, 150)));
+                    ui.label(egui::RichText::new("💡 启用后建议刷新 DNS")
+                        .size(10.0)
+                        .color(egui::Color32::from_rgb(130, 150, 180)));  // Softer blue-gray, less intrusive
                 });
                 
                 ui.add_space(15.0);
@@ -257,15 +298,22 @@ impl GitHubAcceleratorApp {
     }
     
     fn flush_dns(&mut self) {
+        #[cfg(debug_assertions)]
+        info!("User clicked Flush DNS button");
+        
         if cfg!(target_os = "windows") {
             match std::process::Command::new("ipconfig")
                 .arg("/flushdns")
                 .output() {
                 Ok(_) => {
                     *self.status_message.lock().unwrap() = "✓ DNS 缓存已刷新!".to_string();
+                    #[cfg(debug_assertions)]
+                    info!("DNS cache flushed successfully");
                 }
                 Err(e) => {
                     *self.error_message.lock().unwrap() = Some(format!("刷新 DNS 失败: {}", e));
+                    #[cfg(debug_assertions)]
+                    error!("Failed to flush DNS: {}", e);
                 }
             }
         }
@@ -281,6 +329,9 @@ impl GitHubAcceleratorApp {
     }
     
     fn open_github(&mut self) {
+        #[cfg(debug_assertions)]
+        info!("User clicked GitHub button, opening https://github.com");
+        
         #[cfg(target_os = "windows")]
         {
             let _ = std::process::Command::new("cmd")
@@ -303,6 +354,9 @@ impl GitHubAcceleratorApp {
         }
         
         *self.status_message.lock().unwrap() = "正在打开 GitHub...".to_string();
+        
+        #[cfg(debug_assertions)]
+        info!("GitHub URL launched in default browser");
     }
 }
 

@@ -2,7 +2,11 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write, BufWriter};
 use std::path::Path;
 use std::sync::OnceLock;
+
+#[cfg(debug_assertions)]
 use std::time::Instant;
+
+#[cfg(debug_assertions)]
 use crate::logger;
 
 const HOSTS_PATH_WINDOWS: &str = r"C:\Windows\System32\drivers\etc\hosts";
@@ -78,26 +82,22 @@ pub fn is_enabled() -> io::Result<bool> {
 
 /// Ultra-fast enable with pre-built content
 pub fn enable() -> io::Result<()> {
-    let start = Instant::now();
     let hosts_path = get_hosts_path();
     
-    // Quick check
-    match fs::read_to_string(hosts_path) {
-        Ok(content) => {
-            if content.find(MARKER_START).is_some() {
-                #[cfg(debug_assertions)]
-                logger::log_hosts_operation("enable", start.elapsed().as_millis(), true);
-                return Ok(());
-            }
+    // Quick check - avoid unnecessary file operations
+    let content = fs::read_to_string(hosts_path)?;
+    if content.find(MARKER_START).is_some() {
+        #[cfg(debug_assertions)]
+        {
+            let start = Instant::now();
+            logger::log_hosts_operation("enable", start.elapsed().as_millis(), true);
         }
-        Err(e) if e.kind() != io::ErrorKind::NotFound => {
-            #[cfg(debug_assertions)]
-            logger::log_hosts_operation("enable", start.elapsed().as_millis(), false);
-            return Err(e);
-        }
-        _ => {}
+        return Ok(());
     }
 
+    #[cfg(debug_assertions)]
+    let start = Instant::now();
+    
     // Write pre-built content at once using direct binary write
     let file = OpenOptions::new()
         .append(true)
@@ -115,7 +115,9 @@ pub fn enable() -> io::Result<()> {
 
 /// Ultra-fast disable using binary search and slice operations
 pub fn disable() -> io::Result<()> {
+    #[cfg(debug_assertions)]
     let start = Instant::now();
+    
     let hosts_path = get_hosts_path();
     let content = fs::read_to_string(hosts_path)?;
     
