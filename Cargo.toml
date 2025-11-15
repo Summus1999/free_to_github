@@ -10,12 +10,15 @@ repository = "https://github.com/your-username/free_to_github"
 [dependencies]
 eframe = "0.24"
 egui = "0.24"
+log = "0.4"
+env_logger = "0.11"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "windef", "wingdi"] }
 
 [build-dependencies]
 embed-resource = "2.4"
+log = "0.4"
 
 # Windows 下隐藏控制台窗口
 [profile.release]

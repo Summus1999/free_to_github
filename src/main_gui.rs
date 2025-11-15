@@ -5,6 +5,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use free_to_github::hosts;
 
+#[cfg(debug_assertions)]
+use free_to_github::{info, error};
+
 // Cache duration for status checks (in seconds)
 const STATUS_CACHE_DURATION: u64 = 2;
 
@@ -233,15 +236,23 @@ impl eframe::App for GitHubAcceleratorApp {
 impl GitHubAcceleratorApp {
     fn enable_acceleration(&mut self) {
         // Immediate status update for better UX
+        #[cfg(debug_assertions)]
+        info!("User triggered enable acceleration");
+        
         match hosts::enable() {
             Ok(_) => {
                 *self.is_enabled.lock().unwrap() = true;
                 *self.status_message.lock().unwrap() = "✓ 加速已启用!".to_string();
                 *self.error_message.lock().unwrap() = None;
                 *self.last_status_check.lock().unwrap() = Instant::now();
+                #[cfg(debug_assertions)]
+                info!("GitHub acceleration enabled successfully");
             }
             Err(e) => {
-                *self.error_message.lock().unwrap() = Some(format!("启用失败: {}", e));
+                let error_msg = format!("启用失败: {}", e);
+                #[cfg(debug_assertions)]
+                error!("Failed to enable acceleration: {}", e);
+                *self.error_message.lock().unwrap() = Some(error_msg);
                 *self.status_message.lock().unwrap() = "操作失败".to_string();
             }
         }
@@ -249,15 +260,23 @@ impl GitHubAcceleratorApp {
     
     fn disable_acceleration(&mut self) {
         // Immediate status update for better UX
+        #[cfg(debug_assertions)]
+        info!("User triggered disable acceleration");
+        
         match hosts::disable() {
             Ok(_) => {
                 *self.is_enabled.lock().unwrap() = false;
                 *self.status_message.lock().unwrap() = "✓ 加速已禁用!".to_string();
                 *self.error_message.lock().unwrap() = None;
                 *self.last_status_check.lock().unwrap() = Instant::now();
+                #[cfg(debug_assertions)]
+                info!("GitHub acceleration disabled successfully");
             }
             Err(e) => {
-                *self.error_message.lock().unwrap() = Some(format!("禁用失败: {}", e));
+                let error_msg = format!("禁用失败: {}", e);
+                #[cfg(debug_assertions)]
+                error!("Failed to disable acceleration: {}", e);
+                *self.error_message.lock().unwrap() = Some(error_msg);
                 *self.status_message.lock().unwrap() = "操作失败".to_string();
             }
         }
@@ -314,6 +333,13 @@ impl GitHubAcceleratorApp {
 }
 
 fn main() -> Result<(), eframe::Error> {
+    // Initialize file logger for debugging GitHub connection issues (debug builds only)
+    #[cfg(debug_assertions)]
+    {
+        let _ = free_to_github::logger::FileLogger::init();
+        info!("Application started");
+    }
+    
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([520.0, 600.0])

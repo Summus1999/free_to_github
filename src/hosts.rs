@@ -2,6 +2,8 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write, BufWriter};
 use std::path::Path;
 use std::sync::OnceLock;
+use std::time::Instant;
+use crate::logger;
 
 const HOSTS_PATH_WINDOWS: &str = r"C:\Windows\System32\drivers\etc\hosts";
 const HOSTS_PATH_UNIX: &str = "/etc/hosts";
@@ -76,16 +78,23 @@ pub fn is_enabled() -> io::Result<bool> {
 
 /// Ultra-fast enable with pre-built content
 pub fn enable() -> io::Result<()> {
+    let start = Instant::now();
     let hosts_path = get_hosts_path();
     
     // Quick check
     match fs::read_to_string(hosts_path) {
         Ok(content) => {
             if content.find(MARKER_START).is_some() {
+                #[cfg(debug_assertions)]
+                logger::log_hosts_operation("enable", start.elapsed().as_millis(), true);
                 return Ok(());
             }
         }
-        Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
+        Err(e) if e.kind() != io::ErrorKind::NotFound => {
+            #[cfg(debug_assertions)]
+            logger::log_hosts_operation("enable", start.elapsed().as_millis(), false);
+            return Err(e);
+        }
         _ => {}
     }
 
@@ -97,22 +106,26 @@ pub fn enable() -> io::Result<()> {
     let mut writer = BufWriter::with_capacity(1024, file);
     writer.write_all(get_append_bytes())?;
     writer.flush()?;
+    
+    #[cfg(debug_assertions)]
+    logger::log_hosts_operation("enable", start.elapsed().as_millis(), true);
 
     Ok(())
 }
 
 /// Ultra-fast disable using binary search and slice operations
 pub fn disable() -> io::Result<()> {
+    let start = Instant::now();
     let hosts_path = get_hosts_path();
     let content = fs::read_to_string(hosts_path)?;
     
     // Use find for faster string search
     match (content.find(MARKER_START), content.find(MARKER_END)) {
-        (Some(start), Some(end)) => {
+        (Some(start_pos), Some(end)) => {
             let end_pos = end + MARKER_END.len();
             
             // Trim whitespace efficiently
-            let before = content[..start].trim_end_matches('\n');
+            let before = content[..start_pos].trim_end_matches('\n');
             let after = content[end_pos..].trim_start_matches('\n');
             
             // Build new content with minimal allocations
@@ -126,9 +139,16 @@ pub fn disable() -> io::Result<()> {
             }
             
             fs::write(hosts_path, new_content.into_bytes())?;
+            #[cfg(debug_assertions)]
+            logger::log_hosts_operation("disable", start.elapsed().as_millis(), true);
             Ok(())
         }
-        _ => Ok(()), // Not enabled, nothing to do
+        _ => {
+            // Not enabled, nothing to do
+            #[cfg(debug_assertions)]
+            logger::log_hosts_operation("disable", start.elapsed().as_millis(), true);
+            Ok(())
+        }
     }
 }
 

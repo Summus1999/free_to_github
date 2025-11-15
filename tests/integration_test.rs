@@ -1,11 +1,19 @@
 use std::time::Instant;
 use std::net::TcpStream;
 use std::time::Duration;
+use free_to_github::logger;
+
+// Initialize logger for tests
+fn init_logger() {
+    let _ = logger::FileLogger::init();
+}
 
 /// Test GitHub connectivity performance after hosts file modification
 /// Target: Connection should complete within 1 second
 #[test]
 fn test_github_connection_performance() {
+    init_logger();
+    
     // Test connection to github.com
     let start = Instant::now();
     
@@ -15,18 +23,22 @@ fn test_github_connection_performance() {
     ) {
         Ok(_stream) => {
             let elapsed = start.elapsed();
+            let duration_ms = elapsed.as_millis();
             println!("GitHub connection time: {:?}", elapsed);
-            println!("Connection millis: {}", elapsed.as_millis());
+            println!("Connection millis: {}", duration_ms);
+            
+            logger::log_connection_metrics("github.com:443", duration_ms, true);
             
             // Target: connection should be under 1 second
             assert!(
-                elapsed.as_millis() < 1000,
+                duration_ms < 1000,
                 "GitHub connection should complete within 1000ms, took: {:?}",
                 elapsed
             );
         }
         Err(e) => {
             println!("Connection failed (may be offline): {}", e);
+            logger::log_connection_metrics("github.com:443", start.elapsed().as_millis(), false);
             // Don't fail test if network is unavailable
         }
     }
@@ -35,6 +47,8 @@ fn test_github_connection_performance() {
 /// Test multiple rapid connections
 #[test]
 fn test_rapid_github_connections() {
+    init_logger();
+    
     let start = Instant::now();
     let mut success_count = 0;
     
@@ -46,11 +60,23 @@ fn test_rapid_github_connections() {
         ) {
             Ok(_) => {
                 let elapsed = conn_start.elapsed();
+                let duration_ms = elapsed.as_millis();
                 println!("Connection {} took: {:?}", i + 1, elapsed);
+                logger::log_connection_metrics(
+                    &format!("github.com:443 (attempt {})", i + 1),
+                    duration_ms,
+                    true
+                );
                 success_count += 1;
             }
             Err(e) => {
+                let duration_ms = conn_start.elapsed().as_millis();
                 println!("Connection {} failed: {}", i + 1, e);
+                logger::log_connection_metrics(
+                    &format!("github.com:443 (attempt {})", i + 1),
+                    duration_ms,
+                    false
+                );
             }
         }
     }
@@ -70,6 +96,8 @@ fn test_rapid_github_connections() {
 /// Test hosts file operations performance in sequence
 #[test]
 fn test_hosts_operations_sequence() {
+    init_logger();
+    
     use free_to_github::hosts;
     
     let start = Instant::now();
@@ -124,6 +152,8 @@ fn test_performance_benchmark() {
 /// Test cache effectiveness
 #[test]
 fn test_cache_effectiveness() {
+    init_logger();
+    
     use free_to_github::hosts;
     
     let mut times = Vec::new();
