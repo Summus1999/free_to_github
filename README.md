@@ -59,6 +59,11 @@ free_to_github/
 └── FreeToGitHub.exe         # 发布版本
 ```
 
+## 版本
+
+版本2.0
+
 ## 许可证
 
 Apache License 2.0
+
