@@ -4,3 +4,4 @@ Cargo.lock
 *.pdb
 *.log
 .DS_Store
+.qoder/

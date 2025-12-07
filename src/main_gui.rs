@@ -3,7 +3,8 @@
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use free_to_github::hosts;
+use std::thread;
+use free_to_github::{hosts, network};
 
 #[cfg(debug_assertions)]
 use free_to_github::{info, error};
@@ -11,13 +12,37 @@ use free_to_github::{info, error};
 // Cache duration for status checks (in seconds)
 const STATUS_CACHE_DURATION: u64 = 2;
 
+/// Speed test result for display
+#[derive(Clone, Debug)]
+struct SpeedTestResult {
+    domain: String,
+    #[allow(dead_code)]
+    ip: String,
+    latency_ms: u64,
+}
+
+/// Speed test state
+#[derive(Clone, Debug, PartialEq)]
+enum SpeedTestState {
+    Idle,
+    Testing,
+    Completed,
+}
+
 struct GitHubAcceleratorApp {
     status_message: Arc<Mutex<String>>,
     is_enabled: Arc<Mutex<bool>>,
     has_permission: Arc<Mutex<bool>>,
     error_message: Arc<Mutex<Option<String>>>,
     last_status_check: Arc<Mutex<Instant>>,
-    visuals_initialized: bool,  // Performance: avoid setting visuals every frame
+    visuals_initialized: bool,
+    
+    // Speed test state
+    speed_test_state: Arc<Mutex<SpeedTestState>>,
+    speed_test_progress: Arc<Mutex<(usize, usize)>>,  // (completed, total)
+    speed_test_current: Arc<Mutex<String>>,           // Currently testing domain
+    speed_test_results: Arc<Mutex<Vec<SpeedTestResult>>>,
+    has_optimized_ips: Arc<Mutex<bool>>,
 }
 
 impl Default for GitHubAcceleratorApp {
@@ -36,6 +61,13 @@ impl Default for GitHubAcceleratorApp {
             error_message: Arc::new(Mutex::new(None)),
             last_status_check: Arc::new(Mutex::new(Instant::now())),
             visuals_initialized: false,
+            
+            // Speed test state
+            speed_test_state: Arc::new(Mutex::new(SpeedTestState::Idle)),
+            speed_test_progress: Arc::new(Mutex::new((0, 0))),
+            speed_test_current: Arc::new(Mutex::new(String::new())),
+            speed_test_results: Arc::new(Mutex::new(Vec::new())),
+            has_optimized_ips: Arc::new(Mutex::new(false)),
         }
     }
 }
@@ -76,6 +108,11 @@ impl eframe::App for GitHubAcceleratorApp {
         let has_permission = *self.has_permission.lock().unwrap();
         let is_enabled = *self.is_enabled.lock().unwrap();
         let error_message = self.error_message.lock().unwrap().clone();
+        let speed_test_state = self.speed_test_state.lock().unwrap().clone();
+        let has_optimized = *self.has_optimized_ips.lock().unwrap();
+        let speed_results = self.speed_test_results.lock().unwrap().clone();
+        let (progress_done, progress_total) = *self.speed_test_progress.lock().unwrap();
+        let current_testing = self.speed_test_current.lock().unwrap().clone();
         
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
@@ -108,85 +145,157 @@ impl eframe::App for GitHubAcceleratorApp {
                         });
                         ui.add_space(100.0);
                     });
-                    ui.add_space(25.0);
+                    ui.add_space(15.0);
+                }
+                
+                // Speed test progress display
+                if speed_test_state == SpeedTestState::Testing {
+                    ui.horizontal(|ui| {
+                        ui.add_space(80.0);
+                        ui.spinner();
+                        ui.add_space(10.0);
+                        ui.vertical(|ui| {
+                            ui.label(egui::RichText::new(format!("正在测速... ({}/{})", progress_done, progress_total))
+                                .size(14.0).color(egui::Color32::from_rgb(100, 200, 255)));
+                            if !current_testing.is_empty() {
+                                ui.label(egui::RichText::new(format!("测试: {}", current_testing))
+                                    .size(11.0).color(egui::Color32::from_rgb(150, 150, 170)));
+                            }
+                        });
+                    });
+                    ui.add_space(15.0);
+                    // Request repaint for animation
+                    ctx.request_repaint();
                 }
                 
                 // Status display - card style with gradient background
                 let (status_text, status_icon, status_color) = if is_enabled {
-                    ("已启用", "✅", egui::Color32::from_rgb(120, 255, 160))  // Brighter, fresher green
+                    if has_optimized {
+                        ("已启用 (已优化)", "✅", egui::Color32::from_rgb(120, 255, 160))
+                    } else {
+                        ("已启用", "✅", egui::Color32::from_rgb(120, 255, 160))
+                    }
                 } else {
-                    ("未启用", "⭕", egui::Color32::from_rgb(150, 150, 160))  // Adjusted gray
+                    ("未启用", "⭕", egui::Color32::from_rgb(150, 150, 160))
                 };
                 
                 ui.vertical_centered(|ui| {
-                    // Create gradient effect with subtle background
                     let frame = egui::Frame::default()
-                        .fill(egui::Color32::from_rgb(35, 65, 120))  // Lighter blue for card contrast
+                        .fill(egui::Color32::from_rgb(35, 65, 120))
                         .rounding(12.0)
-                        .inner_margin(egui::Margin::same(0.0));  // Remove default margin for precise control
+                        .inner_margin(egui::Margin::same(0.0));
                     frame.show(ui, |ui| {
-                        ui.add_space(25.0);
-                        ui.label(egui::RichText::new(status_icon).size(56.0));
-                        ui.add_space(12.0);
-                        // Enhanced status text - larger font, heavier weight
+                        ui.add_space(20.0);
+                        ui.label(egui::RichText::new(status_icon).size(48.0));
+                        ui.add_space(8.0);
                         ui.label(egui::RichText::new(status_text)
-                            .size(28.0)  // Increased from 24.0 for better prominence
+                            .size(24.0)
                             .color(status_color)
                             .strong());
-                        ui.add_space(25.0);
+                        ui.add_space(20.0);
                     });
                 });
                 
-                ui.add_space(35.0);
+                ui.add_space(20.0);
+                
+                // Speed test results display (when completed)
+                if speed_test_state == SpeedTestState::Completed && !speed_results.is_empty() {
+                    ui.vertical_centered(|ui| {
+                        let frame = egui::Frame::default()
+                            .fill(egui::Color32::from_rgb(25, 50, 90))
+                            .rounding(8.0)
+                            .inner_margin(egui::Margin::same(10.0));
+                        frame.show(ui, |ui| {
+                            ui.label(egui::RichText::new("📊 测速结果")
+                                .size(13.0).color(egui::Color32::from_rgb(150, 180, 220)));
+                            ui.add_space(5.0);
+                            
+                            // Show key domains only
+                            for result in speed_results.iter().take(5) {
+                                let (r, g, b) = network::get_quality_color(result.latency_ms);
+                                let quality = network::get_quality_rating(result.latency_ms);
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new(&result.domain)
+                                        .size(11.0).color(egui::Color32::from_rgb(180, 180, 200)));
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(egui::RichText::new(format!("{}ms {}", result.latency_ms, quality))
+                                            .size(11.0).color(egui::Color32::from_rgb(r, g, b)));
+                                    });
+                                });
+                            }
+                        });
+                    });
+                    ui.add_space(15.0);
+                }
                 
                 // Control buttons - modern design
                 ui.horizontal(|ui| {
-                    ui.add_space(60.0);
+                    ui.add_space(30.0);
                     
-                    // Enable button - vibrant fresh green with rounded corners
-                    let enable_btn = egui::Button::new(
-                        egui::RichText::new("🟢 启用").size(16.0).color(egui::Color32::WHITE)
+                    // Speed test button - orange/yellow
+                    let speed_btn_enabled = speed_test_state != SpeedTestState::Testing;
+                    let speed_btn = egui::Button::new(
+                        egui::RichText::new("⚡ 测速").size(15.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(76, 200, 130))  // More saturated, vibrant green
-                    .rounding(8.0)  // Rounded corners
-                    .min_size(egui::vec2(140.0, 50.0));
+                    .fill(egui::Color32::from_rgb(255, 170, 50))
+                    .rounding(8.0)
+                    .min_size(egui::vec2(90.0, 50.0));
+                    
+                    if ui.add_enabled(speed_btn_enabled, speed_btn).clicked() {
+                        self.start_speed_test();
+                    }
+                    
+                    ui.add_space(12.0);
+                    
+                    // Smart enable button - vibrant fresh green
+                    let enable_text = if has_optimized { "🚀 智能启用" } else { "🟢 启用" };
+                    let enable_btn = egui::Button::new(
+                        egui::RichText::new(enable_text).size(15.0).color(egui::Color32::WHITE)
+                    )
+                    .fill(if has_optimized { 
+                        egui::Color32::from_rgb(50, 180, 120) 
+                    } else { 
+                        egui::Color32::from_rgb(76, 200, 130) 
+                    })
+                    .rounding(8.0)
+                    .min_size(egui::vec2(120.0, 50.0));
                     
                     if ui.add_enabled(has_permission, enable_btn).clicked() {
                         self.enable_acceleration();
                     }
                     
-                    ui.add_space(20.0);
+                    ui.add_space(12.0);
                     
-                    // Disable button - bold alert red with rounded corners
+                    // Disable button - bold alert red
                     let disable_btn = egui::Button::new(
-                        egui::RichText::new("🔴 禁用").size(16.0).color(egui::Color32::WHITE)
+                        egui::RichText::new("🔴 禁用").size(15.0).color(egui::Color32::WHITE)
                     )
-                    .fill(egui::Color32::from_rgb(235, 85, 100))  // More vibrant, alert red
-                    .rounding(8.0)  // Rounded corners
-                    .min_size(egui::vec2(140.0, 50.0));
+                    .fill(egui::Color32::from_rgb(235, 85, 100))
+                    .rounding(8.0)
+                    .min_size(egui::vec2(100.0, 50.0));
                     
                     if ui.add_enabled(has_permission, disable_btn).clicked() {
                         self.disable_acceleration();
                     }
                 });
                 
-                ui.add_space(30.0);
+                ui.add_space(20.0);
                 
                 // Error message display
                 if let Some(error) = error_message.as_ref() {
                     ui.vertical_centered(|ui| {
                         ui.label(egui::RichText::new(error).size(12.0).color(egui::Color32::from_rgb(255, 120, 120)));
                     });
-                    ui.add_space(15.0);
+                    ui.add_space(10.0);
                 }
                 
-                ui.add_space(20.0);
+                ui.add_space(10.0);
                 
                 // Divider line (subtle)
                 ui.vertical_centered(|ui| {
                     ui.label(egui::RichText::new("─────────────────").size(12.0).color(egui::Color32::from_rgb(50, 100, 150)));
                 });
-                ui.add_space(20.0);
+                ui.add_space(15.0);
                 
                 // Utility buttons area - improved spacing and rounded corners
                 ui.horizontal(|ui| {
@@ -235,29 +344,104 @@ impl eframe::App for GitHubAcceleratorApp {
                 
                 ui.add_space(25.0);
                 
-                // Footer tips - softer color for subtle hint
+                // Footer tips
                 ui.vertical_centered(|ui| {
-                    ui.label(egui::RichText::new("💡 启用后建议刷新 DNS")
+                    let tip = if has_optimized {
+                        "💡 已优化 - 使用最快 IP"
+                    } else {
+                        "💡 建议先测速再启用"
+                    };
+                    ui.label(egui::RichText::new(tip)
                         .size(10.0)
-                        .color(egui::Color32::from_rgb(130, 150, 180)));  // Softer blue-gray, less intrusive
+                        .color(egui::Color32::from_rgb(130, 150, 180)));
                 });
                 
-                ui.add_space(15.0);
+                ui.add_space(10.0);
             });
         });
     }
 }
 
 impl GitHubAcceleratorApp {
+    /// Start speed test in background thread
+    fn start_speed_test(&mut self) {
+        #[cfg(debug_assertions)]
+        info!("User started speed test");
+        
+        // Set testing state
+        *self.speed_test_state.lock().unwrap() = SpeedTestState::Testing;
+        *self.speed_test_progress.lock().unwrap() = (0, 0);
+        *self.speed_test_current.lock().unwrap() = String::new();
+        *self.speed_test_results.lock().unwrap() = Vec::new();
+        *self.error_message.lock().unwrap() = None;
+        
+        // Clone Arc references for the thread
+        let state = Arc::clone(&self.speed_test_state);
+        let progress = Arc::clone(&self.speed_test_progress);
+        let current = Arc::clone(&self.speed_test_current);
+        let results = Arc::clone(&self.speed_test_results);
+        let has_optimized = Arc::clone(&self.has_optimized_ips);
+        
+        // Run speed test in background
+        thread::spawn(move || {
+            let progress_cb = {
+                let progress = Arc::clone(&progress);
+                let current = Arc::clone(&current);
+                Arc::new(move |done: usize, total: usize, domain: &str| {
+                    *progress.lock().unwrap() = (done, total);
+                    *current.lock().unwrap() = domain.to_string();
+                })
+            };
+            
+            // Run the test
+            let test_results = network::test_all_domains_parallel(Some(progress_cb));
+            
+            // Convert results for display
+            let mut display_results: Vec<SpeedTestResult> = test_results
+                .iter()
+                .map(|(domain, (ip, latency))| SpeedTestResult {
+                    domain: domain.clone(),
+                    ip: ip.clone(),
+                    latency_ms: *latency,
+                })
+                .collect();
+            
+            // Sort by latency
+            display_results.sort_by_key(|r| r.latency_ms);
+            
+            // Update hosts module with optimized IPs
+            hosts::set_optimized_ips(test_results);
+            
+            // Update UI state
+            *results.lock().unwrap() = display_results;
+            *has_optimized.lock().unwrap() = true;
+            *state.lock().unwrap() = SpeedTestState::Completed;
+            *current.lock().unwrap() = String::new();
+        });
+    }
+    
     fn enable_acceleration(&mut self) {
-        // Immediate status update for better UX
         #[cfg(debug_assertions)]
         info!("User triggered enable acceleration");
         
-        match hosts::enable() {
+        // Use optimized IPs if available
+        let use_optimized = *self.has_optimized_ips.lock().unwrap();
+        
+        let result = if use_optimized {
+            hosts::enable_optimized()
+        } else {
+            hosts::enable()
+        };
+        
+        match result {
             Ok(_) => {
                 *self.is_enabled.lock().unwrap() = true;
-                *self.status_message.lock().unwrap() = "✓ 加速已启用!".to_string();
+                let msg = if use_optimized {
+                    "✓ 已启用优化加速!".to_string()
+                } else {
+                    "✓ 加速已启用!".to_string()
+                };
+                *self.status_message.lock().unwrap() = msg;
                 *self.error_message.lock().unwrap() = None;
                 *self.last_status_check.lock().unwrap() = Instant::now();
                 #[cfg(debug_assertions)]
@@ -370,7 +554,7 @@ fn main() -> Result<(), eframe::Error> {
     
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([520.0, 600.0])
+            .with_inner_size([520.0, 680.0])  // Increased height for speed test results
             .with_resizable(false)
             .with_decorations(true),
         ..Default::default()

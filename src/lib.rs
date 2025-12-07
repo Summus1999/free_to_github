@@ -1,5 +1,6 @@
 pub mod hosts;
 pub mod logger;
+pub mod network;
 
 /// Logging macros exported for all binaries to use
 #[macro_export]
