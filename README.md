@@ -10,11 +10,11 @@
 
 ## 技术栈
 
-| 组件 | 技术 |
-|------|------|
-| 前端 | Vue 3 + TypeScript + Vite |
-| 后端 | Rust + Tauri 2.0 |
-| 构建 | npm + cargo |
+| 组件 | 技术                       |
+|------|----------------------------|
+| 前端 | Vue 3 + TypeScript + Vite  |
+| 后端 | Rust + Tauri 2.0           |
+| 构建 | npm + cargo                |
 
 ## 编译
 
@@ -38,14 +38,14 @@ copy src-tauri\target\release\tauri-ui.exe ..\FreeToGitHub.exe
 
 **编译产物**:
 
-| 文件 | 路径 | 大小 |
-|------|------|------|
-| EXE | `tauri-ui/src-tauri/target/release/tauri-ui.exe` | ~9 MB |
-| MSI安装包 | `tauri-ui/src-tauri/target/release/bundle/msi/*.msi` | ~9 MB |
+| 文件      | 路径                                                 | 大小   |
+|-----------|------------------------------------------------------|--------|
+| EXE       | `tauri-ui/src-tauri/target/release/tauri-ui.exe`     | ~9 MB  |
+| MSI安装包 | `tauri-ui/src-tauri/target/release/bundle/msi/*.msi` | ~9 MB  |
 
 ## 项目结构
 
-```
+```text
 free_to_github/
 ├── tauri-ui/                # Tauri + Vue 项目
 │   ├── src/                 # Vue 前端源码
@@ -66,4 +66,3 @@ free_to_github/
 ## 许可证
 
 Apache License 2.0
-
