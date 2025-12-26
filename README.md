@@ -4,8 +4,8 @@
 
 ## 快速使用
 
-1. 下载 `FreeToGitHub.exe`
-2. 双击运行（自动请求管理员权限）
+1. 下载并安装 `Free to GitHub_2.0.0_x64-setup.exe`
+2. 启动应用（自动请求管理员权限）
 3. 点击「测速」→「启用加速」→「刷新DNS」
 
 ## 技术栈
@@ -26,22 +26,19 @@
 # 1. 进入项目目录
 cd tauri-ui
 
-# 2. 安装依赖
+# 2. 安装依赖（首次编译）
 npm install
 
-# 3. 执行编译
+# 3. 执行编译（生成 NSIS 安装包）
 npm run tauri build
-
-# 4. 复制产物并重命名
-copy src-tauri\target\release\tauri-ui.exe ..\FreeToGitHub.exe
 ```
 
 **编译产物**:
 
-| 文件      | 路径                                                 | 大小   |
-|-----------|------------------------------------------------------|--------|
-| EXE       | `tauri-ui/src-tauri/target/release/tauri-ui.exe`     | ~9 MB  |
-| MSI安装包 | `tauri-ui/src-tauri/target/release/bundle/msi/*.msi` | ~9 MB  |
+| 文件         | 路径                                                                | 大小   |
+|--------------|---------------------------------------------------------------------|--------|
+| EXE          | `tauri-ui/src-tauri/target/release/tauri-ui.exe`                    | ~9 MB  |
+| NSIS安装包   | `tauri-ui/src-tauri/target/release/bundle/nsis/*-setup.exe`         | ~9 MB  |
 
 ## 项目结构
 
@@ -61,7 +58,7 @@ free_to_github/
 
 ## 版本
 
-版本2.0
+2.0.0
 
 ## 许可证
 
