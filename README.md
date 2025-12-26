@@ -23,14 +23,11 @@
 **编译步骤**:
 
 ```bash
-# 1. 进入项目目录
-cd tauri-ui
-
-# 2. 安装依赖（首次编译）
+# 1. 安装依赖（首次编译）
 npm install
 
-# 3. 执行编译（生成 NSIS 安装包）
-npm run tauri build
+# 2. 一键式编译（生成 NSIS 安装包）
+cd tauri-ui && npm run tauri build
 ```
 
 **编译产物**:
